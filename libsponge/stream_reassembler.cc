@@ -13,7 +13,6 @@ void DUMMY_CODE(Targs &&... /* unused */) {}
 StreamReassembler::StreamReassembler(const size_t capacity)
     : _first_unaccep(capacity)
     , _first_unassem(0)
-    , _first_unread(0)
     , _unass_bytes_size(0)
     , _eof_flag(false)
     , _output(capacity)
@@ -25,25 +24,30 @@ StreamReassembler::StreamReassembler(const size_t capacity)
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-
     if (eof) {
         _eof_flag = true;
     }
-    // if no more bytes can be received, just drop the substring.
+    // 1. if no more bytes can be received, just drop the substring.
+    // 2. if substring is out of receive window boundary, just drop it.
     if (isFull() || isNotacc(index, data)) {
+        // substring can be empty string with eof, 
+        // so should check if this is the last eof message.
         if (_eof_flag && empty()) {
             _output.end_input();
         }
         return;
     }
     // Renew the base of sliding window
-    updateWindowBound();
-    // process duplicate and overlap string
-    auto [newIndex, newData] = cutString(data, index);
-    //write to buffer
-    size_t bytesWritten = writeToUnAssemBuffer(newIndex, newData);
-    //update unassembled bytes
-    _unass_bytes_size += bytesWritten;
+    // updateWindowBound
+    _first_unaccep = _capacity + _output.bytes_read();
+    if (index >= _first_unassem) {
+        writeToUnAssemBuffer(index, data);
+    } else if (index + data.length() > _first_unassem) {
+        // process duplicate and overlap string
+        auto [newIndex, newData] = cutString(data, index);
+        // write to buffer
+        writeToUnAssemBuffer(newIndex, newData);
+    }
     write_contiguous();
     if (_eof_flag && empty()) {
         _output.end_input();
@@ -63,11 +67,6 @@ void StreamReassembler::write_contiguous() {
     _output.write(s);
 }
 
-void StreamReassembler::updateWindowBound() {
-    _first_unread += _output.bytes_read();
-    // _first_unaccep = _first_unread + _capacity;
-    _first_unaccep += _output.bytes_read();
-}
 bool StreamReassembler::isNotacc(size_t index, const string& data){
     return (index > _first_unaccep) || ((index + data.length() ) <= _first_unassem);
 }
@@ -78,23 +77,24 @@ bool StreamReassembler::isFull() const {
 size_t StreamReassembler::unassembled_bytes() const {
     return _unass_bytes_size;
 }
-size_t StreamReassembler::writeToUnAssemBuffer(size_t index, const string& s) {
+void StreamReassembler::writeToUnAssemBuffer(size_t index, const string& s) {
     // index must bigger or equal than first_unassem
     size_t offset = index - _first_unassem;
-    // size_t len = s.length();
-    size_t bytesWritten = 0;
-    for (const char& c : s) {
+    size_t strLen = s.length();
+    size_t real_len = std::min(strLen, _capacity - _output.buffer_size());
+    if (real_len < strLen) {
+        _eof_flag = false;
+    }
+    for (size_t i = 0; i < real_len; i++) {
         // false means empty
-        if (_unassembled_valid[offset] == false) {
+        if (_unassembled_valid[i + offset] == false) {
         // every time buffer is written should set flag to true
         // while flag set to false when buffer is read
-        _unassembled_buffer[offset] = c;
-        _unassembled_valid[offset] = true;       
-        bytesWritten += 1;
+        _unassembled_buffer[i + offset] = s[i];
+        _unassembled_valid[i + offset] = true;       
+        _unass_bytes_size++;
         }
-        offset += 1;
     }
-    return bytesWritten;
     
 }
 

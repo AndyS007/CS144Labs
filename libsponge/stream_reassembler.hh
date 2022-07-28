@@ -2,7 +2,7 @@
 #define SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
 
 #include "byte_stream.hh"
-
+#include <algorithm>
 #include <cstdint>
 #include <string>
 using std::string;
@@ -14,7 +14,6 @@ class StreamReassembler {
     // Your code here -- add private members as necessary.
     size_t _first_unaccep;
     size_t _first_unassem;
-    size_t _first_unread;
     size_t _unass_bytes_size;
     bool _eof_flag;
     ByteStream _output;  //!< The reassembled in-order byte stream
@@ -55,12 +54,10 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
-
     bool isFull() const;
     bool isNotacc(size_t index, const string& data);
-    size_t writeToUnAssemBuffer(size_t index, const string& data);
+    void writeToUnAssemBuffer(size_t index, const string& data);
     std::pair<size_t, std::string> cutString(const string&data, const size_t index);
-    void updateWindowBound();
     void write_contiguous();
 };
 
