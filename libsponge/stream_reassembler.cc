@@ -81,7 +81,7 @@ void StreamReassembler::writeToUnAssemBuffer(size_t index, const string& s) {
     // index must bigger or equal than first_unassem
     size_t offset = index - _first_unassem;
     size_t strLen = s.length();
-    size_t real_len = std::min(strLen, _capacity - _output.buffer_size());
+    size_t real_len = std::min(strLen, (_first_unaccep - index));
     if (real_len < strLen) {
         _eof_flag = false;
     }
