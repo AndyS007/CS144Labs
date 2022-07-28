@@ -5,15 +5,22 @@
 
 #include <cstdint>
 #include <string>
+using std::string;
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
 //! possibly overlapping) into an in-order byte stream.
 class StreamReassembler {
   private:
     // Your code here -- add private members as necessary.
-
+    size_t _first_unaccep;
+    size_t _first_unassem;
+    size_t _first_unread;
+    size_t _unass_bytes_size;
+    bool _eof_flag;
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes
+    std::deque<char> _unassembled_buffer;
+    std::deque<bool> _unassembled_valid;
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
@@ -24,7 +31,7 @@ class StreamReassembler {
     //! \brief Receives a substring and writes any newly contiguous bytes into the stream.
     //!
     //! If accepting all the data would overflow the `capacity` of this
-    //! `StreamReassembler`, then only the part of the data that fits will be
+    //! `StreamReassembler`, then onlysize_t first_unass the part of the data that fits will be
     //! accepted. If the substring is only partially accepted, then the `eof`
     //! will be disregarded.
     //!
@@ -48,6 +55,13 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
+
+    bool isFull() const;
+    bool isNotacc(size_t index, const string& data);
+    size_t writeToUnAssemBuffer(size_t index, const string& data);
+    std::pair<size_t, std::string> cutString(const string&data, const size_t index);
+    void updateWindowBound();
+    void write_contiguous();
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH
