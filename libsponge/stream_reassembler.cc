@@ -27,6 +27,10 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     if (eof) {
         _eof_flag = true;
     }
+    // Renew the base of sliding window
+    // updateWindowBound
+    // _first_unaccep = _capacity + _output.bytes_read();
+    _first_unaccep = _capacity + _first_unassem - _output.buffer_size();
     // 1. if no more bytes can be received, just drop the substring.
     // 2. if substring is out of receive window boundary, just drop it.
     if (isFull() || isNotacc(index, data)) {
@@ -37,9 +41,7 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         }
         return;
     }
-    // Renew the base of sliding window
-    // updateWindowBound
-    _first_unaccep = _capacity + _output.bytes_read();
+    
     if (index >= _first_unassem) {
         writeToUnAssemBuffer(index, data);
     } else if (index + data.length() > _first_unassem) {
@@ -68,7 +70,7 @@ void StreamReassembler::write_contiguous() {
 }
 
 bool StreamReassembler::isNotacc(size_t index, const string& data){
-    return (index > _first_unaccep) || ((index + data.length() ) <= _first_unassem);
+    return (index >= _first_unaccep) || ((index + data.length() ) <= _first_unassem);
 }
 bool StreamReassembler::isFull() const {
     return (_output.buffer_size() +  unassembled_bytes() == _capacity);
@@ -113,3 +115,5 @@ std::pair<size_t, std::string> StreamReassembler::cutString(const string &data, 
 
 
 bool StreamReassembler::empty() const { return unassembled_bytes() == 0; }
+
+size_t StreamReassembler::expect_seqno() const { return _first_unassem;}

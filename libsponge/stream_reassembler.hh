@@ -54,6 +54,9 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
+    
+    size_t expect_seqno() const;
+
     bool isFull() const;
     bool isNotacc(size_t index, const string& data);
     void writeToUnAssemBuffer(size_t index, const string& data);

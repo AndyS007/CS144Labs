@@ -20,12 +20,21 @@ class TCPReceiver {
     //! The maximum number of bytes we'll store.
     size_t _capacity;
 
+    // syn flag
+    bool syn_received{false};
+    bool fin_received{false};
+    // absolute seqno
+    size_t _abs_seqno{0};
+
+    size_t _stream_index{0};
+    WrappingInt32 _isn;
+
   public:
     //! \brief Construct a TCP receiver
     //!
     //! \param capacity the maximum number of bytes that the receiver will
     //!                 store in its buffers at any give time.
-    TCPReceiver(const size_t capacity) : _reassembler(capacity), _capacity(capacity) {}
+    TCPReceiver(const size_t capacity) : _reassembler(capacity), _capacity(capacity), _isn(0) {}
 
     //! \name Accessors to provide feedback to the remote TCPSender
     //!@{
@@ -62,6 +71,13 @@ class TCPReceiver {
     ByteStream &stream_out() { return _reassembler.stream_out(); }
     const ByteStream &stream_out() const { return _reassembler.stream_out(); }
     //!@}
+
+    bool out_of_window(bool flag, size_t index, const string &data) {
+      if (flag) {
+        return false;
+      }
+      return _reassembler.isNotacc(index, data);
+    }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_RECEIVER_HH
