@@ -32,7 +32,7 @@ class TCPSender {
           _is_running = false;
         }
         bool isTimeOut(size_t RTO) {
-            if (_time_elapsed > RTO) {
+            if (_time_elapsed >= RTO) {
                 stop();
                 return true;
             } else {
@@ -60,6 +60,7 @@ class TCPSender {
     // add by myselef
     //! receiver window sizes
     uint16_t _rev_window_size{1};
+    uint16_t _free_space{1};
     size_t rwindow{1};
     // ackno from receiver
     uint64_t _abs_ackno{0};
@@ -69,6 +70,7 @@ class TCPSender {
     TCPSender::Timer timer{};
     bool syn_sent{false};
     bool fin_sent{false};
+    bool syn_ack{false};
     unsigned int _consecutive_retransmission{0};
 
   public:
