@@ -17,6 +17,30 @@
 //! segments if the retransmission timer expires.
 class TCPSender {
   private:
+    class Timer {
+      private:
+        size_t _time_elapsed{0};
+        bool _is_running{false};
+      public:
+        void start() {
+            _time_elapsed = 0;
+            _is_running = true;
+        }
+        bool isRunning() { return _is_running; }
+        void stop() {
+          _time_elapsed = 0;
+          _is_running = false;
+        }
+        bool isTimeOut(size_t RTO) {
+            if (_time_elapsed > RTO) {
+                stop();
+                return true;
+            } else {
+                return false;
+            }
+        }
+        void update(size_t ms_since_last_tick) { _time_elapsed += ms_since_last_tick; }
+    };
     //! our initial sequence number, the number for our SYN.
     WrappingInt32 _isn;
 
@@ -31,6 +55,21 @@ class TCPSender {
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+
+    // 
+    // add by myselef
+    //! receiver window sizes
+    uint16_t _rev_window_size{1};
+    size_t rwindow{1};
+    // ackno from receiver
+    uint64_t _abs_ackno{0};
+    uint64_t _bytes_in_flight{0};
+    std::queue<TCPSegment> _outstanding_segments{};
+    size_t RTO;
+    TCPSender::Timer timer{};
+    bool syn_sent{false};
+    bool fin_sent{false};
+    unsigned int _consecutive_retransmission{0};
 
   public:
     //! Initialize a TCPSender
@@ -87,6 +126,8 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+    TCPSegment make_segment(bool fin, bool syn, bool ack, std::optional<std::string> data);
+    void send_segment(TCPSegment& seg);
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
