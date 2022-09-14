@@ -32,15 +32,15 @@ bool TCPReceiver::segment_received(const TCPSegment &seg) {
             return false;
         }
     }
-    
     WrappingInt32 seqno = seg.header().seqno;
     string data = seg.payload().copy();
-    size_t index = unwrap(seqno, _isn, _stream_index);
-    if (index != 0) {
-        index -= 1;
-    }
-    if (out_of_window((seg.header().syn || seg.header().fin), index, data)) {
+    size_t seg_abs_seqno = unwrap(seqno, _isn, _stream_index);
+    if (out_of_window(seg.length_in_sequence_space(), seg_abs_seqno)) {
         return false;
+    }
+    size_t index = seg_abs_seqno;
+    if (index > 0) {
+        index--;
     }
     _reassembler.push_substring(data, index, fin_received);
     _stream_index = _reassembler.expect_seqno();
@@ -55,6 +55,13 @@ optional<WrappingInt32> TCPReceiver::ackno() const {
     } else {
         return wrap(_abs_seqno, _isn);
     }
+}
+
+bool TCPReceiver::out_of_window(size_t len, size_t seg_abs_seqno) {
+    return (seg_abs_seqno >= (_abs_seqno + window_size())) ||
+    (seg_abs_seqno + len <= _abs_seqno);
+    // return (index >= _first_unaccep) || ((index + data.length() ) <= _first_unassem);
+    // return _reassembler.isNotacc(index, data);
 }
 
 size_t TCPReceiver::window_size() const { 

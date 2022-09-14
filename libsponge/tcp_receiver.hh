@@ -72,12 +72,7 @@ class TCPReceiver {
     const ByteStream &stream_out() const { return _reassembler.stream_out(); }
     //!@}
 
-    bool out_of_window(bool flag, size_t index, const string &data) {
-      if (flag) {
-        return false;
-      }
-      return _reassembler.isNotacc(index, data);
-    }
+    bool out_of_window(size_t len, size_t seg_abs_seqno);
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_RECEIVER_HH
