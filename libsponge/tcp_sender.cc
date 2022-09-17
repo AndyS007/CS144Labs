@@ -30,16 +30,15 @@ uint64_t TCPSender::bytes_in_flight() const {
 void TCPSender::fill_window() {
     if (!syn_sent) {
         // send syn
-        bool syn = true;
         bool fin = false;
-        bool ack = false;
-        TCPSegment synSegment = make_segment(fin, syn, ack, std::nullopt);
+        TCPSegment synSegment = make_segment(fin, std::nullopt);
+        synSegment.header().syn = true;
         send_segment(synSegment);
         syn_sent = true;
         return;
     } 
     // if syn not acked, do nothing.
-    if ((!_segments_out.empty()) && (_segments_out.front().header().syn == true)) {
+    if ((!_outstanding_segments.empty()) && (_outstanding_segments.front().header().syn == true)) {
         return;
     }
     // If _stream is empty but input has not ended, do nothing.
@@ -47,7 +46,7 @@ void TCPSender::fill_window() {
         // Lab4 behavior: if incoming_seg.length_in_sequence_space() is not zero, send ack.
         return;
     
-    if (fin_sent) {
+    if (_fin_sent) {
         return;
     }
     if (_rev_window_size > 0) {
@@ -62,7 +61,7 @@ void TCPSender::fill_window() {
             if (_stream.eof() && (static_cast<size_t> (_free_space) > payload_size)) {
                 fin = true;
             }
-            TCPSegment seg = make_segment(fin, false, false, data);
+            TCPSegment seg = make_segment(fin, data);
             send_segment(seg);
             if (_stream.buffer_empty()) {
                 break;
@@ -85,29 +84,40 @@ void TCPSender::fill_window() {
 //! \param window_size The remote receiver's advertised window size
 //! \returns `false` if the ackno appears invalid (acknowledges something the TCPSender hasn't sent yet)
 bool TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    uint64_t old_abs_ackno = _abs_ackno;
-    uint64_t tmp_abs_ackno = unwrap(ackno, _isn, old_abs_ackno);
+    uint64_t tmp_abs_ackno = unwrap(ackno, _isn, _checkpoint);
     if (tmp_abs_ackno > _next_seqno) {
+        // update window information
+        // _rev_window_size = window_size;
+        // rwindow = _base + _rev_window_size;
+        // _free_space = rwindow - _next_seqno;
+        // 纠正错误的ack
+        // send_empty_segment();
+        // segments_out().back().header().ack = true;
+        // segments_out().back().header().ackno = wrap(_base, _isn);
         return false;
     }
-    if (tmp_abs_ackno < _abs_ackno) {
+    if (tmp_abs_ackno < _base) {
+        // update window information
+        // _rev_window_size = window_size;
+        // rwindow = _base + _rev_window_size;
+        // _free_space = rwindow - _next_seqno;
         return true;
-    } else if (tmp_abs_ackno == _abs_ackno) {
-        _abs_ackno = tmp_abs_ackno;
+    } else if (tmp_abs_ackno == _base) {
         _rev_window_size = window_size;
-        rwindow = _abs_ackno + _rev_window_size;
+        rwindow = _base + _rev_window_size;
         _free_space = rwindow - _next_seqno;
         return true;
     }
-    _abs_ackno = tmp_abs_ackno; 
+    _base = tmp_abs_ackno; 
+    _checkpoint = _base >= 1? _base - 1 : _base;
     _rev_window_size = window_size;
-    rwindow = _abs_ackno + _rev_window_size;
+    rwindow = _base + _rev_window_size;
     _free_space = rwindow - _next_seqno;
     //  do with outstanding segments
     while(!_outstanding_segments.empty()) {
         TCPSegment tmp = _outstanding_segments.front();
-        uint64_t tmp_abs_seqno = unwrap(tmp.header().seqno, _isn, old_abs_ackno);
-        if ((tmp.length_in_sequence_space() + tmp_abs_seqno) <= _abs_ackno) {
+        uint64_t tmp_abs_seqno = unwrap(tmp.header().seqno, _isn, _checkpoint);
+        if ((tmp.length_in_sequence_space() + tmp_abs_seqno) <= _base) {
             _bytes_in_flight -= tmp.length_in_sequence_space();
             _outstanding_segments.pop();
         } else {
@@ -162,18 +172,16 @@ void TCPSender::send_segment(TCPSegment& seg) {
     _bytes_in_flight += seg.length_in_sequence_space();
     _free_space -= seg.length_in_sequence_space();
     if (seg.header().fin) {
-        fin_sent = true;
+        _fin_sent = true;
     }
     if (!timer.isRunning()) {
         timer.start();
     }
 } 
 
-TCPSegment TCPSender::make_segment(bool fin, bool syn, bool ack, std::optional<std::string> data) {
+TCPSegment TCPSender::make_segment(bool fin, std::optional<std::string> data) {
     TCPSegment seg;
-    seg.header().syn = syn;
     seg.header().fin = fin;
-    seg.header().ack = ack;
     if (data.has_value()) {
         seg.payload() = std::move(data.value());
     }

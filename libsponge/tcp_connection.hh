@@ -20,6 +20,16 @@ class TCPConnection {
     //! for 10 * _cfg.rt_timeout milliseconds after both streams have ended,
     //! in case the remote TCPConnection doesn't know we've received its whole stream?
     bool _linger_after_streams_finish{true};
+    size_t _time_since_last_segment_received{0};
+    bool _active{true};
+    
+    bool _input_stream_ended{false};
+    bool check_outbound_ended() const;
+    void unclean_shutdown();
+    bool in_listen();
+    void set_ack_win(TCPSegment& seg);
+    void send_RST();
+    bool check_inbound_ended()const;
 
   public:
     //! \name "Input" interface for the writer
@@ -86,6 +96,8 @@ class TCPConnection {
     //! \name construction and destruction
     //! moving is allowed; copying is disallowed; default construction not possible
 
+    bool real_send();
+    
     //!@{
     ~TCPConnection();  //!< destructor sends a RST if the connection is still open
     TCPConnection() = delete;

@@ -63,13 +63,14 @@ class TCPSender {
     uint16_t _free_space{1};
     size_t rwindow{1};
     // ackno from receiver
-    uint64_t _abs_ackno{0};
+    uint64_t _base{0};
+    uint64_t _checkpoint{0};
     uint64_t _bytes_in_flight{0};
     std::queue<TCPSegment> _outstanding_segments{};
     size_t RTO;
     TCPSender::Timer timer{};
     bool syn_sent{false};
-    bool fin_sent{false};
+    bool _fin_sent{false};
     bool syn_ack{false};
     unsigned int _consecutive_retransmission{0};
 
@@ -128,8 +129,9 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
-    TCPSegment make_segment(bool fin, bool syn, bool ack, std::optional<std::string> data);
+    TCPSegment make_segment(bool fin, std::optional<std::string> data);
     void send_segment(TCPSegment& seg);
+    bool fin_sent() { return _fin_sent; }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
